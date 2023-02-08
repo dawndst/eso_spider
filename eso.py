@@ -23,7 +23,7 @@ BASE_URL = 'https://www.elderscrollsonline.com/'
 def init_category(url, name):
     print('Processing %s' % (BASE_URL+url))
 
-    df = pd.DataFrame(columns=['L1_Title', 'L2_Title', 'Item_Name', 'Image_URL'])
+    df = pd.DataFrame(columns=['L1_Title', 'L2_Title', 'Item_Name', 'Image_URL', 'day_left', 'expire_time', 'crown_normal', 'crown_deal', 'gem_normal', 'gem_deal', "seal_normal", 'seal_deal'])
 
 
     result = requests.get(BASE_URL+url, headers = HEADERS)
@@ -56,27 +56,37 @@ def init_category(url, name):
             hasPercentLeft = False
             hasNew = False
 
-            #has limit time offer
-            corner_flag = news_snip.find(class_ = 'crown-flag lto text-center countdown')
+
+            #has limit time offer or new offer
+            corner_flag = news_snip.find(class_ = 'crown-flag lto text-center countdown')  # x day left
+
+            day_left = '-'
+            expire_time = '-'
             if corner_flag:
                 hasDayLeft = True
                 data_timestamp = corner_flag.attrs['data-timestamp']
+                data_timestamp = datetime.fromtimestamp(int(data_timestamp))
+                print(data_timestamp)
                 day_left = news_snip.find(class_ = 'time-left')
+                if day_left:
+                    day_left = day_left.contents[0]
+                    expire_time = data_timestamp
 
-            corner_flag = news_snip.find(class_ = 'crown-flag new text-center')
+            corner_flag = news_snip.find(class_ = 'crown-flag new text-center') # new listing
             if corner_flag:
                 hasNew = True
             
-            corner_flag = news_snip.find(class_ = 'crown-flag text-center countdown')
+            corner_flag = news_snip.find(class_ = 'crown-flag text-center countdown') # x day left and discount
             if not corner_flag:
                 corner_flag = news_snip.find(class_ = 'crown-flag text-center')
 
             if corner_flag:
                 hasPercentLeft = True
                 data_timestamp = corner_flag.attrs['data-timestamp']
-                day_left = news_snip.find(class_ = 'time-left')
+                day_left = news_snip.find(class_ = 'time-left').contents[1]
     
                 discount = corner_flag.contents[2]
+                day_left = 'Discount -' + discount + day_left
         
 
             t = news_snip.find(class_ = 'crown-title')
@@ -89,22 +99,25 @@ def init_category(url, name):
 
 
             #price
+            gem_normal = gem_deal = '-'
             gems_price_area = news_snip.find(class_ = 'gems-price')
             if gems_price_area:
                 gem_normal = gems_price_area.find(class_ = 'bright crown-details').contents[0]
                 if hasDayLeft:
-                    gem_deal = gems_price_area.find_all(class_ = 'sr-only')
+                    gem_deal = gems_price_area.find_all(class_ = 'sr-only')[1].contents[0]
             #print(gem_normal)
             #print(gem_deal[1].contents[0])
 
 
+            seals_normal = seals_deal = '-'
             seals_price_area = news_snip.find(class_ = 'seals-price')
             if seals_price_area:
                 seals_normal = seals_price_area.find(class_ = 'bright crown-details').contents[0]
                 if hasDayLeft:
-                    seals_deal = seals_price_area.find_all(class_ = 'sr-only')
+                    seals_deal = seals_price_area.find_all(class_ = 'sr-only')[1].contents[0]
 
 
+            crown_normal = crown_deal = '-'
             crown_price_area = news_snip.find(class_ = 'crowns-price')
             if crown_price_area:
                 if not hasPercentLeft:
@@ -115,10 +128,11 @@ def init_category(url, name):
                         print(crown_normal)
                 else:
                     #has strike price
+                    print('Has strike price')
                     crown_normal = crown_price_area.find(class_ = 'strike').contents[0]
                     crown_deal = crown_price_area.find(class_ = 'crown-details').contents[1]
         
-            df = pd.concat([pd.DataFrame([[name, title, crown_title, img_url]], columns=df.columns), df], ignore_index=True)
+            df = pd.concat([pd.DataFrame([[name, title, crown_title, img_url, day_left, expire_time, crown_normal, crown_deal, gem_normal, gem_deal, seals_normal, seals_deal]], columns=df.columns), df], ignore_index=True)
 
     dt = datetime.today().date()
     filename = 'eso_%s_%s.xlsx' % (name, dt)
@@ -149,6 +163,7 @@ def init():
         URL_DICT[url] = title
 
     print('URL Dictionary Generated')
+
 #init_category('/en-us/crownstore/eso-plus','s')
 
 #exit(0)
